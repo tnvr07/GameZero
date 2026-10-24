@@ -6,7 +6,7 @@ A Godot 4 top-down action-RPG starter project. The world, terrain atlas, charact
 
 ```text
 art/
-  tiles.png           Optional 16x16 biome tiles
+  tiles.png           16x16 biome tiles adapted from the exterior pack
   player.png          Optional 16x24 player sprite sheet
   objects/            Optional per-object PNG textures
 scenes/
@@ -40,8 +40,8 @@ Defeat the purple creatures for XP. Level 2 strengthens KI blasts; level 3 stren
 All optional art lookup and placeholder generation is centralized in `scripts/art_assets.gd`.
 
 1. Open this project in Godot and ensure the `art` folder beside `project.godot` exists.
-2. Copy your tileset PNG into that folder and name it exactly `tiles.png`. It must contain four 16×16 biome tiles across its first row in this order: candy, fire, ice, desert. Additional rows or columns are allowed.
-3. In Godot's **FileSystem** dock, wait for `art/tiles.png` to appear. If it does not appear, right-click the `art` folder and choose **Reimport**, or use **Project > Reload Current Project**.
+2. The included `art/tiles.png` is a 64×16 strip adapted from the pack's free Godot autotiles. To replace it, use four 16×16 biome tiles across the first row in this order: candy, fire, ice, desert. Additional rows or columns are allowed.
+3. In Godot's **FileSystem** dock, wait for `art/tiles.png` to import. If it does not appear, right-click the `art` folder and choose **Reimport**, or use **Project > Reload Current Project**.
 4. Select `tiles.png` and, in the **Import** dock, ensure **Mipmaps > Generate** is off; click **Reimport** if you change it. Nearest filtering is already set for the project in Project Settings.
 5. Run the project with **F6** or **F5**. The runtime-generated **Ground** `TileMapLayer` uses a four-biome, side-matching Terrain Set and automatically connects terrain borders.
 6. Optionally put a player sheet at `art/player.png`. Use 16×24 frames arranged in four columns and four directional rows (top to bottom: down, left, right, up). Column 1 is the idle pose; the walk animation uses all four columns.
@@ -59,7 +59,15 @@ Missing art uses built-in pixel placeholders, so the project runs without import
 4. Press **F6** to run the current main scene or **F5** to run the project. If asked to choose a main scene, select `scenes/main.tscn`.
 5. Use the controls above. The default window is 1440×810, a 3× integer scale of the 480×270 viewport. The HUD draws at viewport resolution and is automatically enlarged with the integer-scaled viewport.
 
-The `World` builds a `TileMapLayer` and a runtime `TileSet` with a four-terrain, side-matching Terrain Set. Candy terrain uses lime green (#b9dd4f/#a3cc3f), fire uses maroon (#6b2d3a/#52222f), ice uses pale lavender-white (#e8eaf8), and desert uses sand (#e0ae60/#c8934a). Low-frequency FastNoiseLite creates broad biome regions, and two cellular-automata majority passes smooth both biome borders and independently noise-generated lava pools, removing single-cell spikes and filling one-cell holes. Terrain atlas edge variants curve the one-pixel outlines at corner transitions. A second low-frequency FastNoiseLite layer assigns three flat terrain-shade variants in broad patches; a one-pixel outline is drawn only where adjacent patches in the same biome meet, leaving tile interiors seamless. A separate detail layer drives in-biome variation. Scattered ground details vary by biome: candy grass and pebbles, fire cracks and speckles, ice fissures, and desert rocks. Candy lava is red-orange (#e04a2a); fire lava is orange (#ff6a10) with yellow (#ffc233) speckles. Both have dark shore edges and damage the player.
+The `World` builds a `TileMapLayer` and a runtime `TileSet` with a four-terrain, side-matching Terrain Set. Its included terrain strip uses pack art for meadow grass, volcanic earth, pale flagstone, and cobble in candy, fire, ice, and desert regions. Low-frequency FastNoiseLite creates broad biome regions, and two cellular-automata majority passes smooth both biome borders and independently noise-generated lava pools, removing single-cell spikes and filling one-cell holes. Terrain atlas edge variants curve the one-pixel outlines at corner transitions. A second low-frequency FastNoiseLite layer assigns three flat terrain-shade variants in broad patches; a one-pixel outline is drawn only where adjacent patches in the same biome meet, leaving tile interiors seamless. A separate detail layer drives in-biome variation. Scattered ground details vary by biome: candy grass and pebbles, fire cracks and speckles, ice fissures, and desert rocks. Candy lava is red-orange (#e04a2a); fire lava is orange (#ff6a10) with yellow (#ffc233) speckles. Both have dark shore edges and damage the player.
+
+### Exterior pack credits
+
+The included `art/tiles.png` adapts free ground tiles from `exterior-pack-free_version/godot_autotiles/`. Credit the Super Retro World contributors:
+
+- Gif ([@gif_not_jif](https://twitter.com/gif_not_jif))
+- Noiracide ([@Noiracide](https://twitter.com/Noiracide))
+- Romi ([@DessRomaric](https://twitter.com/DessRomaric))
 
 The supplied `VS221_MapPixelMovement.js` is an RPG Maker MV/MZ plugin and cannot be loaded by Godot. Its core movement idea is implemented natively instead: the player and enemies use 12-pixel maximum collision substeps, compact rectangular body hitboxes, and sliding motion along collision surfaces. Dashes use the same collision-aware movement. Press **F3** to toggle the player hitbox and a 12-pixel debug grid.
 
