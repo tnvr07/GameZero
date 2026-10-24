@@ -59,7 +59,7 @@ static func terrain_atlas_texture() -> Texture2D:
 			var neighbors := _decode_variant(variant)
 			for side in range(4):
 				if biome > neighbors[side]:
-					_draw_edge(image, base_tiles, biome * 16, tile_x, tile_y, side)
+					_draw_edge(image, base_tiles, biome * 16, tile_x, tile_y, side, biome, neighbors)
 	_terrain_texture = ImageTexture.create_from_image(image)
 	return _terrain_texture
 
@@ -395,14 +395,33 @@ static func _decode_variant(variant: int) -> Array[int]:
 		value = int(value / 4)
 	return neighbors
 
-static func _draw_edge(image: Image, base_tiles: Image, source_x: int, x: int, y: int, side: int) -> void:
+static func _draw_edge(
+	image: Image,
+	base_tiles: Image,
+	source_x: int,
+	x: int,
+	y: int,
+	side: int,
+	biome: int,
+	neighbors: Array[int]
+) -> void:
 	for offset in range(16):
+		var rounded_start := neighbors[(side + 3) % 4] != biome
+		var rounded_end := neighbors[(side + 1) % 4] != biome
+		var inset := _rounded_edge_inset(offset, rounded_start, rounded_end)
 		match side:
 			0:
-				image.set_pixel(x + offset, y, base_tiles.get_pixel(source_x + offset, 0).darkened(0.38))
+				image.set_pixel(x + offset, y + inset, base_tiles.get_pixel(source_x + offset, 0).darkened(0.38))
 			1:
-				image.set_pixel(x + 15, y + offset, base_tiles.get_pixel(source_x + 15, offset).darkened(0.38))
+				image.set_pixel(x + 15 - inset, y + offset, base_tiles.get_pixel(source_x + 15, offset).darkened(0.38))
 			2:
-				image.set_pixel(x + offset, y + 15, base_tiles.get_pixel(source_x + offset, 15).darkened(0.38))
+				image.set_pixel(x + offset, y + 15 - inset, base_tiles.get_pixel(source_x + offset, 15).darkened(0.38))
 			3:
-				image.set_pixel(x, y + offset, base_tiles.get_pixel(source_x, offset).darkened(0.38))
+				image.set_pixel(x + inset, y + offset, base_tiles.get_pixel(source_x, offset).darkened(0.38))
+
+static func _rounded_edge_inset(offset: int, rounded_start: bool, rounded_end: bool) -> int:
+	if rounded_start and offset < 3:
+		return 2 - offset
+	if rounded_end and offset > 12:
+		return offset - 13
+	return 0

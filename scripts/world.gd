@@ -21,7 +21,9 @@ var ground: TileMapLayer
 var enemies: Node2D
 var actors: Node2D
 var _lava_cells: Dictionary = {}
+var _biome_cells: Dictionary = {}
 var _biome_noise := FastNoiseLite.new()
+var _lava_noise := FastNoiseLite.new()
 var _variation_noise := FastNoiseLite.new()
 
 func _ready() -> void:
@@ -87,7 +89,12 @@ func _generate_world() -> void:
 	_biome_noise.noise_type = FastNoiseLite.TYPE_SIMPLEX
 	_biome_noise.fractal_type = FastNoiseLite.FRACTAL_FBM
 	_biome_noise.fractal_octaves = 2
-	_biome_noise.frequency = 0.012
+	_biome_noise.frequency = 0.008
+	_lava_noise.seed = 28401
+	_lava_noise.noise_type = FastNoiseLite.TYPE_SIMPLEX
+	_lava_noise.fractal_type = FastNoiseLite.FRACTAL_FBM
+	_lava_noise.fractal_octaves = 2
+	_lava_noise.frequency = 0.018
 	_variation_noise.seed = 90721
 	_variation_noise.noise_type = FastNoiseLite.TYPE_SIMPLEX
 	_variation_noise.frequency = 0.075
@@ -98,28 +105,33 @@ func _generate_world() -> void:
 	var desert_cells: Array[Vector2i] = []
 	for y in range(-WORLD_RADIUS, WORLD_RADIUS + 1):
 		for x in range(-WORLD_RADIUS, WORLD_RADIUS + 1):
-			var biome_value := _biome_noise.get_noise_2d(x, y)
-			var biome := _biome_for_value(biome_value)
-			if Vector2i(x, y).length() < 5:
-				biome = 0
 			var cell := Vector2i(x, y)
-			var variation := _variation_noise.get_noise_2d(x, y)
-			if biome == 1 and variation > 0.62:
-				_lava_cells[cell] = true
-			else:
-				match biome:
-					0:
-						candy_cells.append(cell)
-					1:
-						fire_cells.append(cell)
-					2:
-						ice_cells.append(cell)
-					_:
-						desert_cells.append(cell)
+			_biome_cells[cell] = _biome_for_value(_biome_noise.get_noise_2d(x, y))
+	_biome_cells = _smooth_biomes(_biome_cells, 2)
+	for y in range(-WORLD_RADIUS, WORLD_RADIUS + 1):
+		for x in range(-WORLD_RADIUS, WORLD_RADIUS + 1):
+			var cell := Vector2i(x, y)
+			if cell.length() < 5:
+				_biome_cells[cell] = 0
+	for cell in _biome_cells:
+		match _biome_cells[cell]:
+			0:
+				candy_cells.append(cell)
+			1:
+				fire_cells.append(cell)
+			2:
+				ice_cells.append(cell)
+			_:
+				desert_cells.append(cell)
 	ground.set_cells_terrain_connect(candy_cells, 0, 0, true)
 	ground.set_cells_terrain_connect(fire_cells, 0, 1, true)
 	ground.set_cells_terrain_connect(ice_cells, 0, 2, true)
 	ground.set_cells_terrain_connect(desert_cells, 0, 3, true)
+
+	var lava_candidates: Dictionary = {}
+	for cell in _biome_cells:
+		lava_candidates[cell] = _biome_cells[cell] == 1 and _lava_noise.get_noise_2d(cell.x, cell.y) > 0.18
+	_lava_cells = _smooth_lava(lava_candidates, _biome_cells, 2)
 	for lava_cell in _lava_cells:
 		var shore_mask := 0
 		for side in range(CARDINAL_OFFSETS.size()):
@@ -135,13 +147,66 @@ func _lava_atlas_coords(shore_mask: int, variation: int) -> Vector2i:
 	)
 
 func _biome_for_value(value: float) -> int:
-	if value > 0.26:
+	if value > 0.18:
 		return 0
-	if value > -0.24:
+	if value > -0.04:
 		return 1
-	if value > -0.63:
+	if value > -0.24:
 		return 2
 	return 3
+
+func _smooth_biomes(source: Dictionary, passes: int) -> Dictionary:
+	var result := source.duplicate()
+	for pass_index in range(passes):
+		var updated: Dictionary = {}
+		for cell in source:
+			var neighbor_counts: Dictionary = {}
+			for offset_y in range(-1, 2):
+				for offset_x in range(-1, 2):
+					if offset_x == 0 and offset_y == 0:
+						continue
+					var neighbor: Vector2i = cell + Vector2i(offset_x, offset_y)
+					if not source.has(neighbor):
+						continue
+					var biome: int = source[neighbor]
+					neighbor_counts[biome] = int(neighbor_counts.get(biome, 0)) + 1
+			var current_biome: int = source[cell]
+			var dominant_biome := current_biome
+			var dominant_count := 0
+			for candidate in neighbor_counts:
+				var count: int = neighbor_counts[candidate]
+				if count > dominant_count or (count == dominant_count and candidate == current_biome):
+					dominant_biome = candidate
+					dominant_count = count
+			updated[cell] = dominant_biome if dominant_count >= 5 else current_biome
+		result = updated
+		source = updated
+	return result
+
+func _smooth_lava(candidates: Dictionary, biomes: Dictionary, passes: int) -> Dictionary:
+	var result := candidates.duplicate()
+	for pass_index in range(passes):
+		var updated: Dictionary = {}
+		for cell in candidates:
+			if biomes[cell] != 1:
+				updated[cell] = false
+				continue
+			var lava_neighbors := 0
+			for offset_y in range(-1, 2):
+				for offset_x in range(-1, 2):
+					if offset_x == 0 and offset_y == 0:
+						continue
+					var neighbor: Vector2i = cell + Vector2i(offset_x, offset_y)
+					if candidates.get(neighbor, false) and biomes.get(neighbor, -1) == 1:
+						lava_neighbors += 1
+			updated[cell] = lava_neighbors >= 5
+		result = updated
+		candidates = updated
+	var lava: Dictionary = {}
+	for cell in result:
+		if result[cell]:
+			lava[cell] = true
+	return lava
 
 func _scatter_decorations() -> void:
 	var rng := RandomNumberGenerator.new()
@@ -153,7 +218,7 @@ func _scatter_decorations() -> void:
 		var cell := Vector2i(rng.randi_range(-WORLD_RADIUS, WORLD_RADIUS), rng.randi_range(-WORLD_RADIUS, WORLD_RADIUS))
 		if cell.length() < 6 or _lava_cells.has(cell):
 			continue
-		var kind := _biome_for_value(_biome_noise.get_noise_2d(cell.x, cell.y))
+		var kind: int = _biome_cells.get(cell, _biome_for_value(_biome_noise.get_noise_2d(cell.x, cell.y)))
 		var variation := _variation_noise.get_noise_2d(cell.x, cell.y)
 		var position := ground.map_to_local(cell) + Vector2(rng.randf_range(-4.0, 4.0), rng.randf_range(-4.0, 4.0))
 		_spawn_world_object(_decoration_kind(kind, variation, rng), rng.randi(), position, true)
@@ -169,7 +234,7 @@ func _scatter_ground_details(rng: RandomNumberGenerator) -> void:
 		var cell := Vector2i(rng.randi_range(-WORLD_RADIUS, WORLD_RADIUS), rng.randi_range(-WORLD_RADIUS, WORLD_RADIUS))
 		if cell.length() < 5 or _lava_cells.has(cell):
 			continue
-		var biome := _biome_for_value(_biome_noise.get_noise_2d(cell.x, cell.y))
+		var biome: int = _biome_cells.get(cell, _biome_for_value(_biome_noise.get_noise_2d(cell.x, cell.y)))
 		var detail_chance := 0.0
 		match biome:
 			0:
