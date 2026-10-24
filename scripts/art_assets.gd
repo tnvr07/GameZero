@@ -12,6 +12,8 @@ const BIOME_COLORS: Array[Color] = [
 	Color("#d9b969"),
 ]
 
+const TERRAIN_SHADE_COUNT := 3
+
 static var _terrain_texture: Texture2D
 static var _lava_texture: Texture2D
 static var _lava_blast_texture: Texture2D
@@ -48,20 +50,37 @@ const OBJECT_TEXTURE_PATHS: Array[String] = [
 static func terrain_atlas_texture() -> Texture2D:
 	if _terrain_texture != null:
 		return _terrain_texture
-	var image := Image.create(512, 512, false, Image.FORMAT_RGBA8)
+	var image := Image.create(512, 512 * TERRAIN_SHADE_COUNT, false, Image.FORMAT_RGBA8)
 	var base_tiles := _terrain_base_image()
 	for biome in range(4):
-		for variant in range(256):
-			var atlas_index := biome * 256 + variant
-			var tile_x := (atlas_index % 32) * 16
-			var tile_y := int(atlas_index / 32) * 16
-			_copy_terrain_base_tile(image, base_tiles, biome, tile_x, tile_y)
-			var neighbors := _decode_variant(variant)
-			for side in range(4):
-				if biome > neighbors[side]:
-					_draw_edge(image, base_tiles, biome * 16, tile_x, tile_y, side, biome, neighbors)
+		for shade in range(TERRAIN_SHADE_COUNT):
+			for variant in range(256):
+				var atlas_index := _terrain_atlas_index(biome, shade, variant)
+				var tile_x := (atlas_index % 32) * 16
+				var tile_y := int(atlas_index / 32) * 16
+				_copy_terrain_base_tile(image, base_tiles, biome, shade, tile_x, tile_y)
+				var neighbors := _decode_variant(variant)
+				for side in range(4):
+					if biome > neighbors[side]:
+						_draw_edge(image, base_tiles, biome * 16, tile_x, tile_y, side, biome, neighbors)
 	_terrain_texture = ImageTexture.create_from_image(image)
 	return _terrain_texture
+
+static func terrain_atlas_index(biome: int, shade: int, variant: int) -> int:
+	return _terrain_atlas_index(biome, shade, variant)
+
+static func terrain_shade_color(biome: int, shade: int) -> Color:
+	var base := BIOME_COLORS[clampi(biome, 0, BIOME_COLORS.size() - 1)]
+	match clampi(shade, 0, TERRAIN_SHADE_COUNT - 1):
+		0:
+			return base.darkened(0.06)
+		2:
+			return base.lightened(0.06)
+		_:
+			return base
+
+static func _terrain_atlas_index(biome: int, shade: int, variant: int) -> int:
+	return (biome * TERRAIN_SHADE_COUNT + shade) * 256 + variant
 
 static func _terrain_base_image() -> Image:
 	var source_image := _load_optional_image(TILESET_PATH)
@@ -77,10 +96,12 @@ static func _terrain_base_image() -> Image:
 				placeholders.set_pixel(biome * 16 + x, y, BIOME_COLORS[biome])
 	return placeholders
 
-static func _copy_terrain_base_tile(target: Image, base_tiles: Image, biome: int, dest_x: int, dest_y: int) -> void:
+static func _copy_terrain_base_tile(target: Image, base_tiles: Image, biome: int, shade: int, dest_x: int, dest_y: int) -> void:
+	var brightness: float = [-0.06, 0.0, 0.06][shade]
 	for y in range(16):
 		for x in range(16):
-			target.set_pixel(dest_x + x, dest_y + y, base_tiles.get_pixel(biome * 16 + x, y))
+			var color := base_tiles.get_pixel(biome * 16 + x, y)
+			target.set_pixel(dest_x + x, dest_y + y, color.darkened(-brightness) if brightness < 0.0 else color.lightened(brightness))
 
 static func lava_texture() -> Texture2D:
 	if _lava_texture == null:

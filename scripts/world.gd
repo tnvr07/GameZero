@@ -18,12 +18,14 @@ const CARDINAL_OFFSETS: Array[Vector2i] = [
 
 var player: CharacterBody2D
 var ground: TileMapLayer
+var patch_outlines: Node2D
 var enemies: Node2D
 var actors: Node2D
 var _lava_cells: Dictionary = {}
 var _biome_cells: Dictionary = {}
 var _biome_noise := FastNoiseLite.new()
 var _lava_noise := FastNoiseLite.new()
+var _patch_noise := FastNoiseLite.new()
 var _variation_noise := FastNoiseLite.new()
 
 func _ready() -> void:
@@ -49,22 +51,23 @@ func _create_tilemap() -> void:
 	terrain_source.texture_region_size = Vector2i(16, 16)
 	tile_set.add_source(terrain_source, TERRAIN_SOURCE_ID)
 	for biome in range(4):
-		for variant in range(256):
-			var atlas_index := biome * 256 + variant
-			var atlas_coords := Vector2i(atlas_index % 32, int(atlas_index / 32))
-			terrain_source.create_tile(atlas_coords)
-			var tile_data: TileData = terrain_source.get_tile_data(atlas_coords, 0)
-			tile_data.terrain_set = terrain_set
-			tile_data.terrain = biome
-			for side in range(4):
-				var neighbor := (variant >> (side * 2)) & 3
-				var peering_bit: int = [
-					TileSet.CELL_NEIGHBOR_TOP_SIDE,
-					TileSet.CELL_NEIGHBOR_RIGHT_SIDE,
-					TileSet.CELL_NEIGHBOR_BOTTOM_SIDE,
-					TileSet.CELL_NEIGHBOR_LEFT_SIDE,
-				][side]
-				tile_data.set_terrain_peering_bit(peering_bit, neighbor)
+		for shade in range(ArtAssets.TERRAIN_SHADE_COUNT):
+			for variant in range(256):
+				var atlas_index: int = ArtAssets.terrain_atlas_index(biome, shade, variant)
+				var atlas_coords := Vector2i(atlas_index % 32, int(atlas_index / 32))
+				terrain_source.create_tile(atlas_coords)
+				var tile_data: TileData = terrain_source.get_tile_data(atlas_coords, 0)
+				tile_data.terrain_set = terrain_set
+				tile_data.terrain = biome
+				for side in range(4):
+					var neighbor := (variant >> (side * 2)) & 3
+					var peering_bit: int = [
+						TileSet.CELL_NEIGHBOR_TOP_SIDE,
+						TileSet.CELL_NEIGHBOR_RIGHT_SIDE,
+						TileSet.CELL_NEIGHBOR_BOTTOM_SIDE,
+						TileSet.CELL_NEIGHBOR_LEFT_SIDE,
+					][side]
+					tile_data.set_terrain_peering_bit(peering_bit, neighbor)
 	var lava_source := TileSetAtlasSource.new()
 	lava_source.texture = ArtAssets.lava_texture()
 	lava_source.texture_region_size = Vector2i(16, 16)
@@ -74,6 +77,10 @@ func _create_tilemap() -> void:
 	tile_set.add_source(lava_source, LAVA_SOURCE_ID)
 	ground.tile_set = tile_set
 	add_child(ground)
+	patch_outlines = Node2D.new()
+	patch_outlines.name = "GroundPatchOutlines"
+	patch_outlines.set_script(preload("res://scripts/ground_patch_outlines.gd"))
+	add_child(patch_outlines)
 
 	actors = Node2D.new()
 	actors.name = "Actors"
@@ -95,6 +102,11 @@ func _generate_world() -> void:
 	_lava_noise.fractal_type = FastNoiseLite.FRACTAL_FBM
 	_lava_noise.fractal_octaves = 2
 	_lava_noise.frequency = 0.018
+	_patch_noise.seed = 36602
+	_patch_noise.noise_type = FastNoiseLite.TYPE_SIMPLEX
+	_patch_noise.fractal_type = FastNoiseLite.FRACTAL_FBM
+	_patch_noise.fractal_octaves = 2
+	_patch_noise.frequency = 0.014
 	_variation_noise.seed = 90721
 	_variation_noise.noise_type = FastNoiseLite.TYPE_SIMPLEX
 	_variation_noise.frequency = 0.075
@@ -127,6 +139,11 @@ func _generate_world() -> void:
 	ground.set_cells_terrain_connect(fire_cells, 0, 1, true)
 	ground.set_cells_terrain_connect(ice_cells, 0, 2, true)
 	ground.set_cells_terrain_connect(desert_cells, 0, 3, true)
+	var patch_shades: Dictionary = {}
+	for cell in _biome_cells:
+		patch_shades[cell] = _patch_shade_at(cell)
+	_apply_patch_shades(patch_shades)
+	patch_outlines.call("configure", _biome_cells, patch_shades, _lava_cells)
 
 	var lava_candidates: Dictionary = {}
 	for cell in _biome_cells:
@@ -139,6 +156,27 @@ func _generate_world() -> void:
 				shore_mask |= 1 << side
 		var variation := posmod(hash(lava_cell), 16)
 		ground.set_cell(lava_cell, LAVA_SOURCE_ID, _lava_atlas_coords(shore_mask, variation))
+	patch_outlines.call("configure", _biome_cells, patch_shades, _lava_cells)
+
+func _patch_shade_at(cell: Vector2i) -> int:
+	var value := _patch_noise.get_noise_2d(cell.x, cell.y)
+	if value < -0.24:
+		return 0
+	if value > 0.24:
+		return 2
+	return 1
+
+func _apply_patch_shades(patch_shades: Dictionary) -> void:
+	for cell in _biome_cells:
+		var atlas_coords := ground.get_cell_atlas_coords(cell)
+		if atlas_coords == Vector2i(-1, -1):
+			continue
+		var old_index := atlas_coords.y * 32 + atlas_coords.x
+		var variant := posmod(old_index, 256)
+		var biome: int = _biome_cells[cell]
+		var shade: int = patch_shades[cell]
+		var atlas_index: int = ArtAssets.terrain_atlas_index(biome, shade, variant)
+		ground.set_cell(cell, TERRAIN_SOURCE_ID, Vector2i(atlas_index % 32, int(atlas_index / 32)))
 
 func _lava_atlas_coords(shore_mask: int, variation: int) -> Vector2i:
 	return Vector2i(
