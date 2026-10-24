@@ -15,10 +15,16 @@ func _ready() -> void:
 	collision.shape = shape
 	collision.position.y = -2.0
 	add_child(collision)
+	var shadow := Sprite2D.new()
+	shadow.texture = ArtAssets.shadow_texture()
+	shadow.position = Vector2(0, 1)
+	shadow.scale = Vector2(0.65, 0.75)
+	shadow.z_index = -1
+	add_child(shadow)
 	var sprite := Sprite2D.new()
-	sprite.texture = ArtAssets.decoration_texture(1)
+	sprite.texture = ArtAssets.object_texture(ArtAssets.ObjectKind.ROCK)
 	sprite.modulate = Color("#86517c")
-	sprite.offset = Vector2(0, -5)
+	sprite.position = Vector2(0, -8)
 	sprite.scale = Vector2(0.75, 0.75)
 	add_child(sprite)
 
@@ -44,8 +50,3 @@ func take_damage(amount: int) -> void:
 		if player != null:
 			player.call("gain_xp", 10)
 		queue_free()
-
-func _draw() -> void:
-	draw_set_transform(Vector2(0, 2), 0.0, Vector2(1.0, 0.4))
-	draw_circle(Vector2.ZERO, 6.0, Color(0.12, 0.15, 0.18, 0.30))
-	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)

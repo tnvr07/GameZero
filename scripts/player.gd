@@ -18,9 +18,8 @@ var _last_attack_time := -10.0
 var _hurt_cooldown := 0.0
 var _dash_time := 0.0
 var _dash_cooldown := 0.0
-var _animation_time := 0.0
 var _facing := Vector2.DOWN
-var _sprite: Sprite2D
+var _sprite: AnimatedSprite2D
 var _world: Node
 
 func _ready() -> void:
@@ -34,18 +33,16 @@ func _ready() -> void:
 	collision.shape = shape
 	collision.position.y = -2.0
 	add_child(collision)
-	_sprite = Sprite2D.new()
-	_sprite.texture = ArtAssets.player_texture()
-	_sprite.hframes = 4
-	_sprite.vframes = 4
-	_sprite.position.y = -7.0
+	_sprite = AnimatedSprite2D.new()
+	_sprite.sprite_frames = ArtAssets.player_sprite_frames()
+	_sprite.position.y = -12.0
 	add_child(_sprite)
+	_sprite.play("idle_down")
 	var scene_root := get_tree().current_scene
 	if scene_root != null:
 		_world = scene_root.get_node_or_null("World")
 
 func _physics_process(delta: float) -> void:
-	_animation_time += delta
 	_hurt_cooldown = maxf(0.0, _hurt_cooldown - delta)
 	_dash_cooldown = maxf(0.0, _dash_cooldown - delta)
 	_dash_time = maxf(0.0, _dash_time - delta)
@@ -86,13 +83,14 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 
 func _update_sprite() -> void:
-	var row := 0
+	var direction := "down"
 	if absf(_facing.x) > absf(_facing.y):
-		row = 1 if _facing.x < 0.0 else 2
+		direction = "left" if _facing.x < 0.0 else "right"
 	elif _facing.y < 0.0:
-		row = 3
-	var frame := int(_animation_time * (10.0 if velocity.length() > 1.0 else 4.0)) % 4
-	_sprite.frame = row * 4 + frame
+		direction = "up"
+	var animation := ("walk_" if velocity.length_squared() > 1.0 else "idle_") + direction
+	if _sprite.animation != animation:
+		_sprite.play(animation)
 
 func _melee_attack() -> void:
 	var now := Time.get_ticks_msec() / 1000.0

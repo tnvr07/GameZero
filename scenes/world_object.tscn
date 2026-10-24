@@ -1,0 +1,22 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/world_object.gd" id="1_object"]
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_world_object"]
+radius = 5.0
+
+[node name="WorldObject" type="Node2D"]
+y_sort_enabled = true
+script = ExtResource("1_object")
+
+[node name="Shadow" type="Sprite2D" parent="."]
+z_index = -1
+
+[node name="Sprite" type="Sprite2D" parent="."]
+
+[node name="Body" type="StaticBody2D" parent="."]
+collision_layer = 2
+collision_mask = 0
+
+[node name="Shape" type="CollisionShape2D" parent="Body"]
+shape = SubResource("CircleShape2D_world_object")

@@ -1,9 +1,8 @@
 extends Node2D
 
 const ArtAssets = preload("res://scripts/art_assets.gd")
-const DecorationScript = preload("res://scripts/decoration.gd")
 const EnemyScript = preload("res://scripts/enemy.gd")
-const GroundDetailScript = preload("res://scripts/ground_detail.gd")
+const WorldObjectScene: PackedScene = preload("res://scenes/world_object.tscn")
 
 const WORLD_RADIUS := 64
 const DECORATION_COUNT := 300
@@ -19,7 +18,6 @@ const CARDINAL_OFFSETS: Array[Vector2i] = [
 
 var player: CharacterBody2D
 var ground: TileMapLayer
-var decorations: Node2D
 var enemies: Node2D
 var actors: Node2D
 var _lava_cells: Dictionary = {}
@@ -75,15 +73,13 @@ func _create_tilemap() -> void:
 	ground.tile_set = tile_set
 	add_child(ground)
 
-	decorations = Node2D.new()
-	decorations.name = "Decorations"
 	actors = Node2D.new()
 	actors.name = "Actors"
 	actors.y_sort_enabled = true
 	add_child(actors)
-	actors.add_child(decorations)
 	enemies = Node2D.new()
 	enemies.name = "Enemies"
+	enemies.y_sort_enabled = true
 	actors.add_child(enemies)
 
 func _generate_world() -> void:
@@ -159,10 +155,8 @@ func _scatter_decorations() -> void:
 			continue
 		var kind := _biome_for_value(_biome_noise.get_noise_2d(cell.x, cell.y))
 		var variation := _variation_noise.get_noise_2d(cell.x, cell.y)
-		var decoration := DecorationScript.new()
-		decoration.kind = _decoration_kind(kind, variation, rng)
-		decoration.position = ground.map_to_local(cell) + Vector2(rng.randf_range(-4.0, 4.0), rng.randf_range(-4.0, 4.0))
-		decorations.add_child(decoration)
+		var position := ground.map_to_local(cell) + Vector2(rng.randf_range(-4.0, 4.0), rng.randf_range(-4.0, 4.0))
+		_spawn_world_object(_decoration_kind(kind, variation, rng), rng.randi(), position, true)
 		placed += 1
 
 	_scatter_ground_details(rng)
@@ -188,34 +182,39 @@ func _scatter_ground_details(rng: RandomNumberGenerator) -> void:
 				detail_chance = 0.76
 		if rng.randf() > detail_chance:
 			continue
-		var detail := GroundDetailScript.new()
-		detail.kind = _ground_detail_kind(biome, rng)
-		detail.variation = rng.randi()
-		detail.position = ground.map_to_local(cell) + Vector2(rng.randf_range(-5.0, 5.0), rng.randf_range(-5.0, 5.0))
-		decorations.add_child(detail)
+		var position := ground.map_to_local(cell) + Vector2(rng.randf_range(-5.0, 5.0), rng.randf_range(-5.0, 5.0))
+		_spawn_world_object(_ground_detail_kind(biome, rng), rng.randi(), position, false)
 		placed += 1
 
 func _ground_detail_kind(biome: int, rng: RandomNumberGenerator) -> int:
 	match biome:
 		0:
-			return 0 if rng.randf() < 0.56 else 1
+			return ArtAssets.ObjectKind.GRASS_TUFT if rng.randf() < 0.56 else ArtAssets.ObjectKind.PEBBLE
 		1:
-			return 2 if rng.randf() < 0.64 else 3
+			return ArtAssets.ObjectKind.FIRE_CRACK if rng.randf() < 0.64 else ArtAssets.ObjectKind.FIRE_SPECKLES
 		2:
-			return 4
+			return ArtAssets.ObjectKind.ICE_CRACK
 		_:
-			return 5
+			return ArtAssets.ObjectKind.SMALL_ROCK
 
 func _decoration_kind(biome: int, variation: float, rng: RandomNumberGenerator) -> int:
 	match biome:
 		0:
-			return 0 if variation > -0.1 or rng.randf() < 0.35 else 1
+			return ArtAssets.ObjectKind.TREE if variation > -0.1 or rng.randf() < 0.35 else ArtAssets.ObjectKind.ROCK
 		1:
-			return 1
+			return ArtAssets.ObjectKind.ROCK
 		2:
-			return 2 if variation > -0.2 else 1
+			return ArtAssets.ObjectKind.CRYSTAL if variation > -0.2 else ArtAssets.ObjectKind.ROCK
 		_:
-			return 1 if variation > 0.0 or rng.randf() < 0.35 else 0
+			return ArtAssets.ObjectKind.ROCK if variation > 0.0 or rng.randf() < 0.35 else ArtAssets.ObjectKind.TREE
+
+func _spawn_world_object(kind: int, variation: int, object_position: Vector2, is_solid: bool) -> void:
+	var object: Node2D = WorldObjectScene.instantiate()
+	object.set("kind", kind)
+	object.set("variation", variation)
+	object.set("solid", is_solid)
+	object.position = object_position
+	actors.add_child(object)
 
 func is_lava_at(world_position: Vector2) -> bool:
 	var cell := ground.local_to_map(ground.to_local(world_position))
