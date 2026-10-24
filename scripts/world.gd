@@ -71,9 +71,10 @@ func _create_tilemap() -> void:
 	var lava_source := TileSetAtlasSource.new()
 	lava_source.texture = ArtAssets.lava_texture()
 	lava_source.texture_region_size = Vector2i(16, 16)
-	for shore_mask in range(16):
-		for variation in range(16):
-			lava_source.create_tile(_lava_atlas_coords(shore_mask, variation))
+	for biome in range(2):
+		for shore_mask in range(16):
+			for variation in range(16):
+				lava_source.create_tile(_lava_atlas_coords(biome, shore_mask, variation))
 	tile_set.add_source(lava_source, LAVA_SOURCE_ID)
 	ground.tile_set = tile_set
 	add_child(ground)
@@ -147,15 +148,18 @@ func _generate_world() -> void:
 
 	var lava_candidates: Dictionary = {}
 	for cell in _biome_cells:
-		lava_candidates[cell] = _biome_cells[cell] == 1 and _lava_noise.get_noise_2d(cell.x, cell.y) > 0.18
+		var biome: int = _biome_cells[cell]
+		var lava_threshold := 0.34 if biome == 0 else 0.18
+		lava_candidates[cell] = biome if biome <= 1 and cell.length() >= 8.0 and _lava_noise.get_noise_2d(cell.x, cell.y) > lava_threshold else -1
 	_lava_cells = _smooth_lava(lava_candidates, _biome_cells, 2)
 	for lava_cell in _lava_cells:
+		var lava_biome: int = _lava_cells[lava_cell]
 		var shore_mask := 0
 		for side in range(CARDINAL_OFFSETS.size()):
-			if not _lava_cells.has(lava_cell + CARDINAL_OFFSETS[side]):
+			if _lava_cells.get(lava_cell + CARDINAL_OFFSETS[side], -1) != lava_biome:
 				shore_mask |= 1 << side
 		var variation := posmod(hash(lava_cell), 16)
-		ground.set_cell(lava_cell, LAVA_SOURCE_ID, _lava_atlas_coords(shore_mask, variation))
+		ground.set_cell(lava_cell, LAVA_SOURCE_ID, _lava_atlas_coords(lava_biome, shore_mask, variation))
 	patch_outlines.call("configure", _biome_cells, patch_shades, _lava_cells)
 
 func _patch_shade_at(cell: Vector2i) -> int:
@@ -178,9 +182,9 @@ func _apply_patch_shades(patch_shades: Dictionary) -> void:
 		var atlas_index: int = ArtAssets.terrain_atlas_index(biome, shade, variant)
 		ground.set_cell(cell, TERRAIN_SOURCE_ID, Vector2i(atlas_index % 32, int(atlas_index / 32)))
 
-func _lava_atlas_coords(shore_mask: int, variation: int) -> Vector2i:
+func _lava_atlas_coords(biome: int, shore_mask: int, variation: int) -> Vector2i:
 	return Vector2i(
-		(shore_mask & 3) * 4 + (variation & 3),
+		(biome * 4 + (shore_mask & 3)) * 4 + (variation & 3),
 		(shore_mask >> 2) * 4 + (variation >> 2)
 	)
 
@@ -226,8 +230,9 @@ func _smooth_lava(candidates: Dictionary, biomes: Dictionary, passes: int) -> Di
 	for pass_index in range(passes):
 		var updated: Dictionary = {}
 		for cell in candidates:
-			if biomes[cell] != 1:
-				updated[cell] = false
+			var lava_biome: int = candidates[cell]
+			if lava_biome < 0:
+				updated[cell] = -1
 				continue
 			var lava_neighbors := 0
 			for offset_y in range(-1, 2):
@@ -235,15 +240,15 @@ func _smooth_lava(candidates: Dictionary, biomes: Dictionary, passes: int) -> Di
 					if offset_x == 0 and offset_y == 0:
 						continue
 					var neighbor: Vector2i = cell + Vector2i(offset_x, offset_y)
-					if candidates.get(neighbor, false) and biomes.get(neighbor, -1) == 1:
+					if candidates.get(neighbor, -1) == lava_biome and biomes.get(neighbor, -1) == lava_biome:
 						lava_neighbors += 1
-			updated[cell] = lava_neighbors >= 5
+			updated[cell] = lava_biome if lava_neighbors >= 5 else -1
 		result = updated
 		candidates = updated
 	var lava: Dictionary = {}
 	for cell in result:
-		if result[cell]:
-			lava[cell] = true
+		if result[cell] >= 0:
+			lava[cell] = result[cell]
 	return lava
 
 func _scatter_decorations() -> void:

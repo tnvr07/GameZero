@@ -6,15 +6,30 @@ const PLAYER_PATH := "res://art/player.png"
 const OBJECTS_PATH := "res://art/objects/"
 
 const BIOME_COLORS: Array[Color] = [
-	Color("#7fae67"),
-	Color("#d45a48"),
-	Color("#8acbd3"),
-	Color("#d9b969"),
+	Color("#b9dd4f"),
+	Color("#6b2d3a"),
+	Color("#e8eaf8"),
+	Color("#e0ae60"),
+]
+
+const BIOME_DARK_COLORS: Array[Color] = [
+	Color("#a3cc3f"),
+	Color("#52222f"),
+	Color("#d6d9eb"),
+	Color("#c8934a"),
+]
+
+const BIOME_LIGHT_COLORS: Array[Color] = [
+	Color("#cce86b"),
+	Color("#80404c"),
+	Color("#f4f5ff"),
+	Color("#eac47e"),
 ]
 
 const TERRAIN_SHADE_COUNT := 3
 
 static var _terrain_texture: Texture2D
+static var _terrain_uses_placeholder := false
 static var _lava_texture: Texture2D
 static var _lava_blast_texture: Texture2D
 static var _player_texture: Texture2D
@@ -70,14 +85,14 @@ static func terrain_atlas_index(biome: int, shade: int, variant: int) -> int:
 	return _terrain_atlas_index(biome, shade, variant)
 
 static func terrain_shade_color(biome: int, shade: int) -> Color:
-	var base := BIOME_COLORS[clampi(biome, 0, BIOME_COLORS.size() - 1)]
+	var safe_biome := clampi(biome, 0, BIOME_COLORS.size() - 1)
 	match clampi(shade, 0, TERRAIN_SHADE_COUNT - 1):
 		0:
-			return base.darkened(0.06)
+			return BIOME_DARK_COLORS[safe_biome]
 		2:
-			return base.lightened(0.06)
+			return BIOME_LIGHT_COLORS[safe_biome]
 		_:
-			return base
+			return BIOME_COLORS[safe_biome]
 
 static func _terrain_atlas_index(biome: int, shade: int, variant: int) -> int:
 	return (biome * TERRAIN_SHADE_COUNT + shade) * 256 + variant
@@ -86,53 +101,65 @@ static func _terrain_base_image() -> Image:
 	var source_image := _load_optional_image(TILESET_PATH)
 	if source_image != null:
 		if source_image.get_width() >= 64 and source_image.get_height() >= 16:
+			_terrain_uses_placeholder = false
 			return source_image
 		push_error("%s must contain four 16x16 biome tiles across its first row." % TILESET_PATH)
 
+	_terrain_uses_placeholder = true
 	var placeholders := Image.create(64, 16, false, Image.FORMAT_RGBA8)
 	for biome in range(4):
-		for y in range(16):
-			for x in range(16):
-				placeholders.set_pixel(biome * 16 + x, y, BIOME_COLORS[biome])
+		placeholders.fill_rect(Rect2i(biome * 16, 0, 16, 16), BIOME_COLORS[biome])
 	return placeholders
 
 static func _copy_terrain_base_tile(target: Image, base_tiles: Image, biome: int, shade: int, dest_x: int, dest_y: int) -> void:
-	var brightness: float = [-0.06, 0.0, 0.06][shade]
 	for y in range(16):
 		for x in range(16):
-			var color := base_tiles.get_pixel(biome * 16 + x, y)
-			target.set_pixel(dest_x + x, dest_y + y, color.darkened(-brightness) if brightness < 0.0 else color.lightened(brightness))
+			var color: Color
+			if _terrain_uses_placeholder:
+				color = terrain_shade_color(biome, shade)
+			else:
+				color = base_tiles.get_pixel(biome * 16 + x, y)
+				match shade:
+					0:
+						color = color.darkened(0.08)
+					2:
+						color = color.lightened(0.08)
+			target.set_pixel(dest_x + x, dest_y + y, color)
 
 static func lava_texture() -> Texture2D:
 	if _lava_texture == null:
-		var image := Image.create(256, 256, false, Image.FORMAT_RGBA8)
-		for shore_mask in range(16):
-			for variation in range(16):
-				var rng := RandomNumberGenerator.new()
-				rng.seed = 6043 + shore_mask * 97 + variation
-				var tile_origin := Vector2i(
-					((shore_mask & 3) * 4 + (variation & 3)) * 16,
-					((shore_mask >> 2) * 4 + (variation >> 2)) * 16
-				)
-				image.fill_rect(Rect2i(tile_origin, Vector2i(16, 16)), Color("#ef692d"))
-				for speckle in range(12):
-					var speckle_origin := tile_origin + Vector2i(rng.randi_range(1, 14), rng.randi_range(1, 14))
-					image.set_pixelv(speckle_origin, Color("#ffb844"))
-					if rng.randf() < 0.35:
-						image.set_pixelv(speckle_origin + Vector2i(1, 0), Color("#ffd65a"))
-				for side in range(4):
-					if (shore_mask & (1 << side)) == 0:
-						continue
-					for offset in range(16):
-						match side:
-							0:
-								image.set_pixel(tile_origin.x + offset, tile_origin.y, Color("#63343b"))
-							1:
-								image.set_pixel(tile_origin.x + 15, tile_origin.y + offset, Color("#63343b"))
-							2:
-								image.set_pixel(tile_origin.x + offset, tile_origin.y + 15, Color("#63343b"))
-							3:
-								image.set_pixel(tile_origin.x, tile_origin.y + offset, Color("#63343b"))
+		var image := Image.create(512, 256, false, Image.FORMAT_RGBA8)
+		for biome in range(2):
+			for shore_mask in range(16):
+				for variation in range(16):
+					var rng := RandomNumberGenerator.new()
+					rng.seed = 6043 + biome * 1543 + shore_mask * 97 + variation
+					var tile_origin := Vector2i(
+						((biome * 4 + (shore_mask & 3)) * 4 + (variation & 3)) * 16,
+						((shore_mask >> 2) * 4 + (variation >> 2)) * 16
+					)
+					var lava_color := Color("#e04a2a") if biome == 0 else Color("#ff6a10")
+					var speckle_color := Color("#ff9a39") if biome == 0 else Color("#ffc233")
+					var shore_color := Color("#71352e") if biome == 0 else Color("#52222f")
+					image.fill_rect(Rect2i(tile_origin, Vector2i(16, 16)), lava_color)
+					for speckle in range(12):
+						var speckle_origin := tile_origin + Vector2i(rng.randi_range(1, 14), rng.randi_range(1, 14))
+						image.set_pixelv(speckle_origin, speckle_color)
+						if rng.randf() < 0.35:
+							image.set_pixelv(speckle_origin + Vector2i(1, 0), speckle_color.lightened(0.12))
+					for side in range(4):
+						if (shore_mask & (1 << side)) == 0:
+							continue
+						for offset in range(16):
+							match side:
+								0:
+									image.set_pixel(tile_origin.x + offset, tile_origin.y, shore_color)
+								1:
+									image.set_pixel(tile_origin.x + 15, tile_origin.y + offset, shore_color)
+								2:
+									image.set_pixel(tile_origin.x + offset, tile_origin.y + 15, shore_color)
+								3:
+									image.set_pixel(tile_origin.x, tile_origin.y + offset, shore_color)
 		_lava_texture = ImageTexture.create_from_image(image)
 	return _lava_texture
 
@@ -260,29 +287,29 @@ static func _create_object_placeholder(kind: int, variation: int) -> Image:
 			_fill_rect(image, Rect2i(5, 9, 1, 6), Color("#79d6d8"))
 			_set_detail_pixel(image, Vector2i(8, 4), Color("#e0fff2"))
 		ObjectKind.GRASS_TUFT:
-			_draw_detail_line(image, Vector2i(7, 15), Vector2i(5, 8), Color("#42734c"))
-			_draw_detail_line(image, Vector2i(8, 15), Vector2i(8, 5), Color("#67a858"))
-			_draw_detail_line(image, Vector2i(9, 15), Vector2i(11, 8), Color("#91c76b"))
-			_draw_detail_line(image, Vector2i(8, 15), Vector2i(8, 9), Color("#b3d773"))
+			_draw_detail_line(image, Vector2i(7, 15), Vector2i(5, 8), Color("#a3cc3f"))
+			_draw_detail_line(image, Vector2i(8, 15), Vector2i(8, 5), Color("#b9dd4f"))
+			_draw_detail_line(image, Vector2i(9, 15), Vector2i(11, 8), Color("#cce86b"))
+			_draw_detail_line(image, Vector2i(8, 15), Vector2i(8, 9), Color("#e0f58b"))
 		ObjectKind.FIRE_CRACK:
 			var crack_glow := Color(1.0, 0.40, 0.08, 0.34)
-			var crack_core := Color("#ffbf4e")
+			var crack_core := Color("#ffc233")
 			_draw_detail_glow_line(image, Vector2i(2, 9), Vector2i(7, 8), crack_glow, crack_core)
 			_draw_detail_glow_line(image, Vector2i(7, 8), Vector2i(10, 4), crack_glow, crack_core)
 			_draw_detail_glow_line(image, Vector2i(7, 8), Vector2i(13, 11), crack_glow, crack_core)
 		ObjectKind.FIRE_SPECKLES:
 			for speckle in range(5):
 				var point := Vector2i(rng.randi_range(2, 13), rng.randi_range(3, 13))
-				_set_detail_pixel(image, point, Color("#f28d42"))
+				_set_detail_pixel(image, point, Color("#ff6a10"))
 				if rng.randf() < 0.5:
-					_set_detail_pixel(image, point + Vector2i(1, 0), Color("#ffc653"))
+					_set_detail_pixel(image, point + Vector2i(1, 0), Color("#ffc233"))
 		ObjectKind.ICE_CRACK:
-			var ice_crack := Color("#4e8d9d")
+			var ice_crack := Color("#9fe3f2")
 			_draw_detail_line(image, Vector2i(2, 8), Vector2i(8, 8), ice_crack)
 			_draw_detail_line(image, Vector2i(8, 8), Vector2i(11, 4), ice_crack)
 			_draw_detail_line(image, Vector2i(8, 8), Vector2i(12, 13), ice_crack)
-			_set_detail_pixel(image, Vector2i(4, 7), Color("#d6f5ed"))
-			_set_detail_pixel(image, Vector2i(9, 7), Color("#b6e2df"))
+			_set_detail_pixel(image, Vector2i(4, 7), Color("#e8eaf8"))
+			_set_detail_pixel(image, Vector2i(9, 7), Color("#c9f0f7"))
 	return image
 
 static func _fill_rect(image: Image, rect: Rect2i, color: Color) -> void:
