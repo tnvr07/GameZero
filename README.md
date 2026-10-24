@@ -59,3 +59,5 @@ Missing art uses built-in pixel placeholders, so the project runs without import
 5. Use the controls above. The default window is 1440×810, a 3× integer scale of the 480×270 viewport. The HUD draws at viewport resolution and is automatically enlarged with the integer-scaled viewport.
 
 The `World` builds a `TileMapLayer` and a runtime `TileSet` with a four-terrain, side-matching Terrain Set. FastNoiseLite creates broad biome regions and a separate detail layer marks lava pockets and drives in-biome variation. Scattered ground details vary by biome: candy grass and pebbles, fire cracks and speckles, ice fissures, and desert rocks. Lava tiles use orange, seeded yellow speckles and a dark outline only along the shore; standing on lava damages the player.
+
+The HUD uses 9×8 generated pixel-art heart textures (full, half, empty) and a built-in 3×5 bitmap glyph set rendered as integer-sized rectangles, so it needs no font download/import and has no font antialiasing.

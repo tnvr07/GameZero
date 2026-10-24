@@ -19,6 +19,7 @@ static var _player_texture: Texture2D
 static var _object_textures: Dictionary = {}
 static var _object_source_textures: Dictionary = {}
 static var _shadow_texture: Texture2D
+static var _heart_textures: Array[Texture2D] = []
 
 enum ObjectKind {
 	TREE,
@@ -152,6 +153,47 @@ static func shadow_texture() -> Texture2D:
 				image.set_pixel(x, y, Color(0.08, 0.10, 0.12, 0.28 * edge * edge))
 	_shadow_texture = ImageTexture.create_from_image(image)
 	return _shadow_texture
+
+static func heart_texture(state: int) -> Texture2D:
+	while _heart_textures.size() < 3:
+		_heart_textures.append(_create_heart_texture(_heart_textures.size()))
+	return _heart_textures[clampi(state, 0, 2)]
+
+static func _create_heart_texture(state: int) -> Texture2D:
+	var rows: Array[String] = [
+		"..##.##..",
+		".#######.",
+		"#########",
+		"#########",
+		".#######.",
+		"..#####..",
+		"...###...",
+		"....#....",
+	]
+	var image := Image.create(9, 8, false, Image.FORMAT_RGBA8)
+	var fill_color := Color("#ef5360")
+	var outline_color := Color("#8e3549")
+	if state == 0:
+		fill_color = Color("#704351")
+		outline_color = Color("#493342")
+	for y in range(8):
+		for x in range(9):
+			if rows[y].substr(x, 1) != "#":
+				continue
+			var is_outline := (
+				x == 0 or x == 8 or y == 0 or y == 7
+				or rows[y].substr(maxi(0, x - 1), 1) != "#"
+				or rows[y].substr(mini(8, x + 1), 1) != "#"
+				or rows[maxi(0, y - 1)].substr(x, 1) != "#"
+				or rows[mini(7, y + 1)].substr(x, 1) != "#"
+			)
+			if is_outline:
+				image.set_pixel(x, y, outline_color)
+			elif state == 1 and x >= 4:
+				image.set_pixel(x, y, Color("#493342"))
+			else:
+				image.set_pixel(x, y, fill_color.lightened(0.16) if y == 1 and (x == 2 or x == 6) else fill_color)
+	return ImageTexture.create_from_image(image)
 
 static func _create_object_placeholder(kind: int, variation: int) -> Image:
 	var size := Vector2i(24, 32) if kind == ObjectKind.TREE else Vector2i(16, 24) if kind == ObjectKind.CRYSTAL else Vector2i(16, 16)

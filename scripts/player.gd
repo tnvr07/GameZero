@@ -8,7 +8,7 @@ const DASH_SPEED := 250.0
 const MAX_HEALTH := 5
 const MAX_KI := 100.0
 
-var health := MAX_HEALTH
+var health: float = MAX_HEALTH
 var ki := MAX_KI
 var level := 1
 var xp := 0
@@ -119,12 +119,12 @@ func _dash() -> void:
 	_dash_time = 0.16
 	_dash_cooldown = 1.0 if level < 3 else 0.65
 
-func take_damage(amount: int) -> void:
+func take_damage(amount: float) -> void:
 	if _hurt_cooldown > 0.0:
 		return
-	health = maxi(0, health - amount)
+	health = maxf(0.0, health - amount)
 	_hurt_cooldown = 0.75
-	if health == 0:
+	if health <= 0.0:
 		health = MAX_HEALTH
 		global_position = Vector2.ZERO
 		ki = MAX_KI
