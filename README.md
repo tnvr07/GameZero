@@ -33,10 +33,15 @@ Defeat the purple creatures for XP. Level 2 strengthens KI blasts; level 3 stren
 
 The only asset lookup and placeholder-generation code is in `scripts/art_assets.gd`.
 
-1. Create an `art` folder beside `project.godot`.
-2. Put your 16×16 tile sheet at `art/tiles.png`. The first four tiles across its top row are read in this order: candy, fire, ice, desert. Terrain borders are generated from those base tiles.
-3. Optionally put a 64×64, 4-column by 4-row player sheet at `art/player.png`. Each frame is 16×16; rows are down, left, right, up.
-4. Optionally put a 24×28 decoration sheet at `art/decorations.png` if you want to replace the generated prop textures. For a custom layout, update only the corresponding asset helper in `scripts/art_assets.gd`.
+1. Open this project in Godot and ensure the `art` folder beside `project.godot` exists.
+2. Copy your tileset PNG into that folder and name it exactly `tiles.png`. It must contain four 16×16 biome tiles across its first row in this order: candy, fire, ice, desert. Additional rows or columns are allowed.
+3. In Godot's **FileSystem** dock, wait for `art/tiles.png` to appear. If it does not appear, right-click the `art` folder and choose **Reimport**, or use **Project > Reload Current Project**.
+4. Select `tiles.png` and, in the **Import** dock, ensure **Mipmaps > Generate** is off; click **Reimport** if you change it. Nearest filtering is already set for the project in Project Settings.
+5. Run the project with **F6** or **F5**. The runtime-generated **Ground** `TileMapLayer` uses a four-biome, side-matching Terrain Set and automatically connects terrain borders.
+6. Optionally put a 64×64, 4-column by 4-row player sheet at `art/player.png`. Each frame is 16×16; rows are down, left, right, up.
+7. Optionally put a 24×28 decoration sheet at `art/decorations.png` if you want to replace the generated prop textures. For a custom layout, update only the corresponding asset helper in `scripts/art_assets.gd`.
+
+The terrain texture hook is `ArtAssets._terrain_base_image()` in `scripts/art_assets.gd`: it reads those four tiles from `res://art/tiles.png`, or creates flat-color placeholders when the PNG is missing. The atlas generator adds a single darker pixel on each biome boundary; matching interior edges receive no outline. You do not need to paint atlas tiles or configure terrain peering bits manually in the editor.
 
 Missing art uses built-in pixel placeholders, so the project runs without importing any image files.
 

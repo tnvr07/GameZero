@@ -23,20 +23,38 @@ static func terrain_atlas_texture() -> Texture2D:
 	if _terrain_texture != null:
 		return _terrain_texture
 	var image := Image.create(512, 512, false, Image.FORMAT_RGBA8)
-	var source_image := _load_optional_image(TILESET_PATH)
+	var base_tiles := _terrain_base_image()
 	for biome in range(4):
 		for variant in range(256):
 			var atlas_index := biome * 256 + variant
 			var tile_x := (atlas_index % 32) * 16
 			var tile_y := int(atlas_index / 32) * 16
-			_copy_or_fill_tile(image, source_image, biome, tile_x, tile_y)
+			_copy_terrain_base_tile(image, base_tiles, biome, tile_x, tile_y)
 			var neighbors := _decode_variant(variant)
 			for side in range(4):
-				if neighbors[side] != biome:
-					_draw_edge(image, tile_x, tile_y, side, BIOME_COLORS[biome].darkened(0.43))
-	image.generate_mipmaps()
+				if biome > neighbors[side]:
+					_draw_edge(image, base_tiles, biome * 16, tile_x, tile_y, side)
 	_terrain_texture = ImageTexture.create_from_image(image)
 	return _terrain_texture
+
+static func _terrain_base_image() -> Image:
+	var source_image := _load_optional_image(TILESET_PATH)
+	if source_image != null:
+		if source_image.get_width() >= 64 and source_image.get_height() >= 16:
+			return source_image
+		push_error("%s must contain four 16x16 biome tiles across its first row." % TILESET_PATH)
+
+	var placeholders := Image.create(64, 16, false, Image.FORMAT_RGBA8)
+	for biome in range(4):
+		for y in range(16):
+			for x in range(16):
+				placeholders.set_pixel(biome * 16 + x, y, BIOME_COLORS[biome])
+	return placeholders
+
+static func _copy_terrain_base_tile(target: Image, base_tiles: Image, biome: int, dest_x: int, dest_y: int) -> void:
+	for y in range(16):
+		for x in range(16):
+			target.set_pixel(dest_x + x, dest_y + y, base_tiles.get_pixel(biome * 16 + x, y))
 
 static func lava_texture() -> Texture2D:
 	if _lava_texture == null:
@@ -114,21 +132,6 @@ static func _load_optional_image(path: String) -> Image:
 		return null
 	return image
 
-static func _copy_or_fill_tile(target: Image, source: Image, biome: int, dest_x: int, dest_y: int) -> void:
-	if source != null and source.get_width() >= (biome + 1) * 16 and source.get_height() >= 16:
-		var source_x := biome * 16
-		for y in range(16):
-			for x in range(16):
-				target.set_pixel(dest_x + x, dest_y + y, source.get_pixel(source_x + x, y))
-		return
-	var base := BIOME_COLORS[biome]
-	for y in range(16):
-		for x in range(16):
-			var color := base.darkened(0.12) if x == 0 or y == 0 or x == 15 or y == 15 else base
-			if (x * 7 + y * 11 + biome * 13) % 29 == 0:
-				color = base.lightened(0.12)
-			target.set_pixel(dest_x + x, dest_y + y, color)
-
 static func _decode_variant(variant: int) -> Array[int]:
 	var neighbors: Array[int] = []
 	var value := variant
@@ -137,18 +140,14 @@ static func _decode_variant(variant: int) -> Array[int]:
 		value = int(value / 4)
 	return neighbors
 
-static func _draw_edge(image: Image, x: int, y: int, side: int, color: Color) -> void:
+static func _draw_edge(image: Image, base_tiles: Image, source_x: int, x: int, y: int, side: int) -> void:
 	for offset in range(16):
 		match side:
 			0:
-				image.set_pixel(x + offset, y, color)
-				image.set_pixel(x + offset, y + 1, color.darkened(0.25))
+				image.set_pixel(x + offset, y, base_tiles.get_pixel(source_x + offset, 0).darkened(0.38))
 			1:
-				image.set_pixel(x + 15, y + offset, color)
-				image.set_pixel(x + 14, y + offset, color.darkened(0.25))
+				image.set_pixel(x + 15, y + offset, base_tiles.get_pixel(source_x + 15, offset).darkened(0.38))
 			2:
-				image.set_pixel(x + offset, y + 15, color)
-				image.set_pixel(x + offset, y + 14, color.darkened(0.25))
+				image.set_pixel(x + offset, y + 15, base_tiles.get_pixel(source_x + offset, 15).darkened(0.38))
 			3:
-				image.set_pixel(x, y + offset, color)
-				image.set_pixel(x + 1, y + offset, color.darkened(0.25))
+				image.set_pixel(x, y + offset, base_tiles.get_pixel(source_x, offset).darkened(0.38))
