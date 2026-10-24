@@ -46,6 +46,6 @@ Missing art uses built-in pixel placeholders, so the project runs without import
 2. In the Project Manager, choose **Import**, browse to this folder, and select `project.godot`.
 3. Open the imported project and allow the initial filesystem scan/import to finish.
 4. Press **F6** to run the current main scene or **F5** to run the project. If asked to choose a main scene, select `scenes/main.tscn`.
-5. Use the controls above. The default window is 960×540, a 2× integer scale of the 480×270 viewport.
+5. Use the controls above. The default window is 1440×810, a 3× integer scale of the 480×270 viewport. The HUD draws at viewport resolution and is automatically enlarged with the integer-scaled viewport.
 
 The `World` builds a `TileMapLayer` and a runtime `TileSet` with a four-terrain, side-matching Terrain Set. FastNoiseLite creates broad biome regions and a separate detail layer marks lava pockets and drives in-biome variation.

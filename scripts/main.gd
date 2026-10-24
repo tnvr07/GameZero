@@ -16,6 +16,7 @@ func _ready() -> void:
 	world.player = player
 
 	var camera := Camera2D.new()
+	camera.zoom = Vector2(1.5, 1.5)
 	camera.position_smoothing_enabled = true
 	camera.position_smoothing_speed = 8.0
 	player.add_child(camera)
