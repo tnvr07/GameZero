@@ -15,7 +15,7 @@ func _ready() -> void:
 	shape_node.shape = shape
 	add_child(shape_node)
 	var sprite := Sprite2D.new()
-	sprite.texture = ArtAssets.lava_texture()
+	sprite.texture = ArtAssets.lava_blast_texture()
 	sprite.scale = Vector2(0.55, 0.55)
 	add_child(sprite)
 	body_entered.connect(_on_body_entered)

@@ -3,11 +3,19 @@ extends Node2D
 const ArtAssets = preload("res://scripts/art_assets.gd")
 const DecorationScript = preload("res://scripts/decoration.gd")
 const EnemyScript = preload("res://scripts/enemy.gd")
+const GroundDetailScript = preload("res://scripts/ground_detail.gd")
 
 const WORLD_RADIUS := 64
 const DECORATION_COUNT := 300
+const GROUND_DETAIL_COUNT := 480
 const TERRAIN_SOURCE_ID := 0
 const LAVA_SOURCE_ID := 1
+const CARDINAL_OFFSETS: Array[Vector2i] = [
+	Vector2i.UP,
+	Vector2i.RIGHT,
+	Vector2i.DOWN,
+	Vector2i.LEFT,
+]
 
 var player: CharacterBody2D
 var ground: TileMapLayer
@@ -60,7 +68,9 @@ func _create_tilemap() -> void:
 	var lava_source := TileSetAtlasSource.new()
 	lava_source.texture = ArtAssets.lava_texture()
 	lava_source.texture_region_size = Vector2i(16, 16)
-	lava_source.create_tile(Vector2i.ZERO)
+	for shore_mask in range(16):
+		for variation in range(16):
+			lava_source.create_tile(_lava_atlas_coords(shore_mask, variation))
 	tile_set.add_source(lava_source, LAVA_SOURCE_ID)
 	ground.tile_set = tile_set
 	add_child(ground)
@@ -99,7 +109,6 @@ func _generate_world() -> void:
 			var cell := Vector2i(x, y)
 			var variation := _variation_noise.get_noise_2d(x, y)
 			if biome == 1 and variation > 0.62:
-				ground.set_cell(cell, LAVA_SOURCE_ID, Vector2i.ZERO)
 				_lava_cells[cell] = true
 			else:
 				match biome:
@@ -115,6 +124,19 @@ func _generate_world() -> void:
 	ground.set_cells_terrain_connect(fire_cells, 0, 1, true)
 	ground.set_cells_terrain_connect(ice_cells, 0, 2, true)
 	ground.set_cells_terrain_connect(desert_cells, 0, 3, true)
+	for lava_cell in _lava_cells:
+		var shore_mask := 0
+		for side in range(CARDINAL_OFFSETS.size()):
+			if not _lava_cells.has(lava_cell + CARDINAL_OFFSETS[side]):
+				shore_mask |= 1 << side
+		var variation := posmod(hash(lava_cell), 16)
+		ground.set_cell(lava_cell, LAVA_SOURCE_ID, _lava_atlas_coords(shore_mask, variation))
+
+func _lava_atlas_coords(shore_mask: int, variation: int) -> Vector2i:
+	return Vector2i(
+		(shore_mask & 3) * 4 + (variation & 3),
+		(shore_mask >> 2) * 4 + (variation >> 2)
+	)
 
 func _biome_for_value(value: float) -> int:
 	if value > 0.26:
@@ -142,6 +164,47 @@ func _scatter_decorations() -> void:
 		decoration.position = ground.map_to_local(cell) + Vector2(rng.randf_range(-4.0, 4.0), rng.randf_range(-4.0, 4.0))
 		decorations.add_child(decoration)
 		placed += 1
+
+	_scatter_ground_details(rng)
+
+func _scatter_ground_details(rng: RandomNumberGenerator) -> void:
+	var attempts := 0
+	var placed := 0
+	while placed < GROUND_DETAIL_COUNT and attempts < GROUND_DETAIL_COUNT * 12:
+		attempts += 1
+		var cell := Vector2i(rng.randi_range(-WORLD_RADIUS, WORLD_RADIUS), rng.randi_range(-WORLD_RADIUS, WORLD_RADIUS))
+		if cell.length() < 5 or _lava_cells.has(cell):
+			continue
+		var biome := _biome_for_value(_biome_noise.get_noise_2d(cell.x, cell.y))
+		var detail_chance := 0.0
+		match biome:
+			0:
+				detail_chance = 0.84
+			1:
+				detail_chance = 0.82
+			2:
+				detail_chance = 0.55
+			_:
+				detail_chance = 0.76
+		if rng.randf() > detail_chance:
+			continue
+		var detail := GroundDetailScript.new()
+		detail.kind = _ground_detail_kind(biome, rng)
+		detail.variation = rng.randi()
+		detail.position = ground.map_to_local(cell) + Vector2(rng.randf_range(-5.0, 5.0), rng.randf_range(-5.0, 5.0))
+		decorations.add_child(detail)
+		placed += 1
+
+func _ground_detail_kind(biome: int, rng: RandomNumberGenerator) -> int:
+	match biome:
+		0:
+			return 0 if rng.randf() < 0.56 else 1
+		1:
+			return 2 if rng.randf() < 0.64 else 3
+		2:
+			return 4
+		_:
+			return 5
 
 func _decoration_kind(biome: int, variation: float, rng: RandomNumberGenerator) -> int:
 	match biome:

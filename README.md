@@ -53,4 +53,4 @@ Missing art uses built-in pixel placeholders, so the project runs without import
 4. Press **F6** to run the current main scene or **F5** to run the project. If asked to choose a main scene, select `scenes/main.tscn`.
 5. Use the controls above. The default window is 1440×810, a 3× integer scale of the 480×270 viewport. The HUD draws at viewport resolution and is automatically enlarged with the integer-scaled viewport.
 
-The `World` builds a `TileMapLayer` and a runtime `TileSet` with a four-terrain, side-matching Terrain Set. FastNoiseLite creates broad biome regions and a separate detail layer marks lava pockets and drives in-biome variation.
+The `World` builds a `TileMapLayer` and a runtime `TileSet` with a four-terrain, side-matching Terrain Set. FastNoiseLite creates broad biome regions and a separate detail layer marks lava pockets and drives in-biome variation. Scattered ground details vary by biome: candy grass and pebbles, fire cracks and speckles, ice fissures, and desert rocks. Lava tiles use orange, seeded yellow speckles and a dark outline only along the shore; standing on lava damages the player.
