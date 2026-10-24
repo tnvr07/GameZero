@@ -1,10 +1,13 @@
 extends CharacterBody2D
 
 const ArtAssets = preload("res://scripts/art_assets.gd")
+const PixelMovement = preload("res://scripts/pixel_movement.gd")
 const ProjectileScript = preload("res://scripts/projectile.gd")
 
 const MOVE_SPEED := 88.0
 const DASH_SPEED := 250.0
+const PIXEL_STEP_SIZE := 12.0
+const MAX_COLLISION_SLIDES := 4
 const MAX_HEALTH := 5
 const MAX_KI := 100.0
 
@@ -21,6 +24,7 @@ var _dash_cooldown := 0.0
 var _facing := Vector2.DOWN
 var _sprite: AnimatedSprite2D
 var _world: Node
+var _show_movement_debug := false
 
 func _ready() -> void:
 	add_to_group("player")
@@ -28,10 +32,10 @@ func _ready() -> void:
 	collision_mask = 2
 	collision_priority = 1.0
 	var collision := CollisionShape2D.new()
-	var shape := CircleShape2D.new()
-	shape.radius = 5.0
+	var shape := RectangleShape2D.new()
+	shape.size = Vector2(9.6, 7.2)
 	collision.shape = shape
-	collision.position.y = -2.0
+	collision.position = Vector2(0.0, -3.6)
 	add_child(collision)
 	_sprite = AnimatedSprite2D.new()
 	_sprite.sprite_frames = ArtAssets.player_sprite_frames()
@@ -60,7 +64,7 @@ func _physics_process(delta: float) -> void:
 		velocity = _facing.normalized() * DASH_SPEED
 	else:
 		velocity = input * MOVE_SPEED
-	move_and_slide()
+	PixelMovement.move_body(self, velocity * delta, PIXEL_STEP_SIZE, MAX_COLLISION_SLIDES)
 	_update_sprite()
 	if _world != null and _world.call("is_lava_at", global_position) and _hurt_cooldown <= 0.0:
 		take_damage(1)
@@ -81,6 +85,20 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif key_event.keycode == KEY_SHIFT:
 		_dash()
 		get_viewport().set_input_as_handled()
+	elif key_event.keycode == KEY_F3:
+		_show_movement_debug = not _show_movement_debug
+		queue_redraw()
+		get_viewport().set_input_as_handled()
+
+func _draw() -> void:
+	if not _show_movement_debug:
+		return
+	var half_view := get_viewport_rect().size * 0.5
+	for x in range(-int(half_view.x), int(half_view.x) + 1, int(PIXEL_STEP_SIZE)):
+		draw_line(Vector2(x, -half_view.y), Vector2(x, half_view.y), Color(0.40, 0.80, 1.0, 0.22), 1.0)
+	for y in range(-int(half_view.y), int(half_view.y) + 1, int(PIXEL_STEP_SIZE)):
+		draw_line(Vector2(-half_view.x, y), Vector2(half_view.x, y), Color(0.40, 0.80, 1.0, 0.22), 1.0)
+	draw_rect(Rect2(-4.8, -7.2, 9.6, 7.2), Color(1.0, 0.30, 0.25, 0.85), false, 1.0)
 
 func _update_sprite() -> void:
 	var direction := "down"

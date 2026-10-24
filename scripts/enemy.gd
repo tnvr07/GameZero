@@ -1,6 +1,10 @@
 extends CharacterBody2D
 
 const ArtAssets = preload("res://scripts/art_assets.gd")
+const PixelMovement = preload("res://scripts/pixel_movement.gd")
+
+const PIXEL_STEP_SIZE := 12.0
+const MAX_COLLISION_SLIDES := 4
 
 var health := 4
 var _attack_cooldown := 0.0
@@ -10,10 +14,10 @@ func _ready() -> void:
 	collision_layer = 2
 	collision_mask = 1
 	var collision := CollisionShape2D.new()
-	var shape := CircleShape2D.new()
-	shape.radius = 6.0
+	var shape := RectangleShape2D.new()
+	shape.size = Vector2(10.0, 8.0)
 	collision.shape = shape
-	collision.position.y = -2.0
+	collision.position = Vector2(0.0, -4.0)
 	add_child(collision)
 	var shadow := Sprite2D.new()
 	shadow.texture = ArtAssets.shadow_texture()
@@ -36,7 +40,7 @@ func _physics_process(delta: float) -> void:
 	var offset := player.global_position - global_position
 	if offset.length() < 130.0:
 		velocity = offset.normalized() * 34.0
-		move_and_slide()
+		PixelMovement.move_body(self, velocity * delta, PIXEL_STEP_SIZE, MAX_COLLISION_SLIDES)
 		if offset.length() < 14.0 and _attack_cooldown <= 0.0:
 			player.call("take_damage", 1)
 			_attack_cooldown = 1.1

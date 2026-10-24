@@ -31,6 +31,7 @@ project.godot
 - KI blast: J (costs 20 KI; KI regenerates).
 - Dash: Shift.
 - Select hotbar slot: 1–9.
+- Movement collision debug grid/hitbox: F3.
 
 Defeat the purple creatures for XP. Level 2 strengthens KI blasts; level 3 strengthens melee and shortens dash recovery. Lava damages the player. A knockout respawns the player at the starting clearing.
 
@@ -59,5 +60,7 @@ Missing art uses built-in pixel placeholders, so the project runs without import
 5. Use the controls above. The default window is 1440×810, a 3× integer scale of the 480×270 viewport. The HUD draws at viewport resolution and is automatically enlarged with the integer-scaled viewport.
 
 The `World` builds a `TileMapLayer` and a runtime `TileSet` with a four-terrain, side-matching Terrain Set. Candy terrain uses lime green (#b9dd4f/#a3cc3f), fire uses maroon (#6b2d3a/#52222f), ice uses pale lavender-white (#e8eaf8), and desert uses sand (#e0ae60/#c8934a). Low-frequency FastNoiseLite creates broad biome regions, and two cellular-automata majority passes smooth both biome borders and independently noise-generated lava pools, removing single-cell spikes and filling one-cell holes. Terrain atlas edge variants curve the one-pixel outlines at corner transitions. A second low-frequency FastNoiseLite layer assigns three flat terrain-shade variants in broad patches; a one-pixel outline is drawn only where adjacent patches in the same biome meet, leaving tile interiors seamless. A separate detail layer drives in-biome variation. Scattered ground details vary by biome: candy grass and pebbles, fire cracks and speckles, ice fissures, and desert rocks. Candy lava is red-orange (#e04a2a); fire lava is orange (#ff6a10) with yellow (#ffc233) speckles. Both have dark shore edges and damage the player.
+
+The supplied `VS221_MapPixelMovement.js` is an RPG Maker MV/MZ plugin and cannot be loaded by Godot. Its core movement idea is implemented natively instead: the player and enemies use 12-pixel maximum collision substeps, compact rectangular body hitboxes, and sliding motion along collision surfaces. Dashes use the same collision-aware movement. Press **F3** to toggle the player hitbox and a 12-pixel debug grid.
 
 The HUD uses 9×8 generated pixel-art heart textures (full, half, empty) and a built-in 3×5 bitmap glyph set rendered as integer-sized rectangles, so it needs no font download/import and has no font antialiasing.
